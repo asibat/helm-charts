@@ -2,7 +2,7 @@ apiVersion: v2
 name: icp-agent
 description: Incident Context Platform Kubernetes agent for runtime events and OTLP log ingest
 type: application
-version: 0.1.0
+version: 0.1.1
 appVersion: "0.1.0"
 keywords:
   - observability

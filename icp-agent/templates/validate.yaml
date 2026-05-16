@@ -1,6 +1,9 @@
 {{- if and (not .Values.ingestToken.existingSecret) (not .Values.ingestToken.value) }}
 {{- fail "Set ingestToken.value or ingestToken.existingSecret before installing icp-agent" }}
 {{- end }}
+{{- if not .Values.watch.defaultEnvironment }}
+{{- fail "Set watch.defaultEnvironment (e.g. \"production\" or \"staging\") before installing icp-agent" }}
+{{- end }}
 {{- if and .Values.watcher.enabled (not .Values.watcher.image.tag) }}
 {{- fail "Set watcher.image.tag to a specific version (e.g. sha-abc1234) before installing icp-agent" }}
 {{- end }}

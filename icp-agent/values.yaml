@@ -16,7 +16,7 @@ ingestToken:
 watch:
   # "*" watches all namespaces. Set a namespace like "production" to restrict scope.
   namespace: "*"
-  defaultEnvironment: "production"
+  defaultEnvironment: ""
   emitTimeoutMs: 5000
 
 watcher:
