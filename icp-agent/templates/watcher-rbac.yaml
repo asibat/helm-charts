@@ -1,0 +1,46 @@
+{{- if and .Values.watcher.enabled .Values.watcher.serviceAccount.create }}
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: {{ include "icp-agent.watcherServiceAccountName" . }}
+  labels:
+    {{- include "icp-agent.labels" . | nindent 4 }}
+    app.kubernetes.io/component: watcher
+{{- end }}
+{{- if and .Values.watcher.enabled .Values.watcher.rbac.create }}
+---
+{{- $clusterScoped := or (eq .Values.watch.namespace "*") (eq .Values.watch.namespace "") }}
+apiVersion: rbac.authorization.k8s.io/v1
+kind: {{ if $clusterScoped }}ClusterRole{{ else }}Role{{ end }}
+metadata:
+  name: {{ include "icp-agent.fullname" . }}-watcher
+  {{- if not $clusterScoped }}
+  namespace: {{ .Values.watch.namespace }}
+  {{- end }}
+  labels:
+    {{- include "icp-agent.labels" . | nindent 4 }}
+    app.kubernetes.io/component: watcher
+rules:
+  - apiGroups: [""]
+    resources: ["pods"]
+    verbs: ["get", "list", "watch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: {{ if $clusterScoped }}ClusterRoleBinding{{ else }}RoleBinding{{ end }}
+metadata:
+  name: {{ include "icp-agent.fullname" . }}-watcher
+  {{- if not $clusterScoped }}
+  namespace: {{ .Values.watch.namespace }}
+  {{- end }}
+  labels:
+    {{- include "icp-agent.labels" . | nindent 4 }}
+    app.kubernetes.io/component: watcher
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: {{ if $clusterScoped }}ClusterRole{{ else }}Role{{ end }}
+  name: {{ include "icp-agent.fullname" . }}-watcher
+subjects:
+  - kind: ServiceAccount
+    name: {{ include "icp-agent.watcherServiceAccountName" . }}
+    namespace: {{ .Release.Namespace }}
+{{- end }}

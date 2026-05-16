@@ -1,0 +1,77 @@
+nameOverride: ""
+fullnameOverride: ""
+
+api:
+  # Public or private ICP API base URL, without a trailing slash.
+  url: "https://api.clarixops.dev"
+
+ingestToken:
+  # For quick installs:
+  #   helm upgrade --install icp-agent ./infra/helm/icp-agent --set-string ingestToken.value=...
+  # For production GitOps, prefer existingSecret.
+  value: ""
+  existingSecret: ""
+  secretKey: "ICP_INGEST_TOKEN"
+
+watch:
+  # "*" watches all namespaces. Set a namespace like "production" to restrict scope.
+  namespace: "*"
+  defaultEnvironment: "production"
+  emitTimeoutMs: 5000
+
+watcher:
+  enabled: true
+  image:
+    repository: "ghcr.io/asibat/incident-context-watcher"
+    tag: ""
+    pullPolicy: IfNotPresent
+  serviceAccount:
+    create: true
+    name: ""
+  rbac:
+    create: true
+  resources:
+    requests:
+      cpu: 25m
+      memory: 64Mi
+    limits:
+      cpu: 200m
+      memory: 128Mi
+  nodeSelector: {}
+  tolerations:
+    - operator: Exists
+      effect: NoSchedule
+  affinity: {}
+
+otelCollector:
+  enabled: true
+  image:
+    repository: "otel/opentelemetry-collector-contrib"
+    tag: "0.113.0"
+    pullPolicy: IfNotPresent
+  serviceAccount:
+    create: true
+    name: ""
+  rbac:
+    create: true
+  startAt: end
+  batch:
+    timeout: 2s
+    sendBatchSize: 50
+  resources:
+    requests:
+      cpu: 50m
+      memory: 128Mi
+    limits:
+      cpu: 300m
+      memory: 256Mi
+  nodeSelector: {}
+  tolerations:
+    - operator: Exists
+      effect: NoSchedule
+  affinity: {}
+  extraRedactionStatements: []
+  podLogHostPath: /var/log/pods
+
+podAnnotations: {}
+podLabels: {}

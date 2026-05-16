@@ -1,0 +1,17 @@
+ICP agent installed in namespace {{ .Release.Namespace }}.
+
+Components:
+{{- if .Values.watcher.enabled }}
+- watcher DaemonSet: {{ include "icp-agent.fullname" . }}-watcher
+{{- end }}
+{{- if .Values.otelCollector.enabled }}
+- OTel Collector DaemonSet: {{ include "icp-agent.fullname" . }}-otel
+{{- end }}
+
+Check rollout:
+  kubectl -n {{ .Release.Namespace }} rollout status daemonset/{{ include "icp-agent.fullname" . }}-watcher
+  kubectl -n {{ .Release.Namespace }} rollout status daemonset/{{ include "icp-agent.fullname" . }}-otel
+
+Check logs:
+  kubectl -n {{ .Release.Namespace }} logs -l app.kubernetes.io/component=watcher --tail=50
+  kubectl -n {{ .Release.Namespace }} logs -l app.kubernetes.io/component=otel-collector --tail=50

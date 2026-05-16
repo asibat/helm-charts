@@ -1,0 +1,80 @@
+{{- if .Values.otelCollector.enabled }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "icp-agent.fullname" . }}-otel-config
+  labels:
+    {{- include "icp-agent.labels" . | nindent 4 }}
+    app.kubernetes.io/component: otel-collector
+data:
+  config.yaml: |
+    extensions:
+      health_check:
+        endpoint: 0.0.0.0:13133
+      file_storage:
+        directory: /var/lib/otelcol
+
+    receivers:
+      filelog:
+        include:
+          - {{ include "icp-agent.podLogInclude" . }}
+        start_at: {{ .Values.otelCollector.startAt }}
+        include_file_path: true
+        storage: file_storage
+        operators:
+          - type: container
+            id: container-parser
+          # json_parser intentionally omitted: body must remain a string for
+          # the OTLP normalizer (otlp.ts reads body.stringValue) and for OTTL
+          # replace_pattern to work without silently dropping records.
+
+    processors:
+      transform/redact:
+        error_mode: ignore
+        log_statements:
+          - context: log
+            statements:
+              - replace_pattern(body, "(?i)(password|secret|token|api_key|apikey|auth|bearer)([=:\\s\"']+)[^\\s&\"']+", "$$1$$2***REDACTED***")
+              - replace_pattern(body, "\\b(?:\\d[ -]?){13,19}\\b", "***CARD***")
+              - replace_pattern(body, "[a-zA-Z0-9._%+\\-]+@[a-zA-Z0-9.\\-]+\\.[a-zA-Z]{2,}", "***EMAIL***")
+              {{- range .Values.otelCollector.extraRedactionStatements }}
+              - {{ . }}
+              {{- end }}
+
+      batch:
+        timeout: {{ .Values.otelCollector.batch.timeout }}
+        send_batch_size: {{ .Values.otelCollector.batch.sendBatchSize }}
+
+      resource:
+        attributes:
+          - key: collector.source
+            value: kubernetes-filelog
+            action: upsert
+
+    exporters:
+      otlphttp/icp:
+        logs_endpoint: {{ include "icp-agent.apiUrl" . }}/ingest/logs/otlp
+        headers:
+          Authorization: Bearer ${env:ICP_INGEST_TOKEN}
+        encoding: json
+        compression: gzip
+        tls:
+          insecure: false
+        timeout: 5s
+        retry_on_failure:
+          enabled: true
+          initial_interval: 1s
+          max_interval: 10s
+          max_elapsed_time: 60s
+
+    service:
+      extensions: [health_check, file_storage]
+      pipelines:
+        logs:
+          receivers: [filelog]
+          processors: [transform/redact, batch, resource]
+          exporters: [otlphttp/icp]
+      telemetry:
+        logs:
+          level: info
+{{- end }}

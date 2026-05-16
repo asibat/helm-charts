@@ -1,0 +1,72 @@
+{{- if .Values.watcher.enabled }}
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: {{ include "icp-agent.fullname" . }}-watcher
+  labels:
+    {{- include "icp-agent.labels" . | nindent 4 }}
+    app.kubernetes.io/component: watcher
+spec:
+  selector:
+    matchLabels:
+      {{- include "icp-agent.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: watcher
+  template:
+    metadata:
+      labels:
+        {{- include "icp-agent.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: watcher
+        {{- with .Values.podLabels }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+      {{- with .Values.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+    spec:
+      serviceAccountName: {{ include "icp-agent.watcherServiceAccountName" . }}
+      containers:
+        - name: watcher
+          image: "{{ .Values.watcher.image.repository }}:{{ .Values.watcher.image.tag }}"
+          imagePullPolicy: {{ .Values.watcher.image.pullPolicy }}
+          env:
+            - name: ICP_INGEST_URL
+              value: {{ include "icp-agent.apiUrl" . | quote }}
+            - name: ICP_INGEST_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "icp-agent.secretName" . }}
+                  key: {{ .Values.ingestToken.secretKey }}
+            - name: ICP_WATCH_NAMESPACE
+              value: {{ .Values.watch.namespace | quote }}
+            - name: ICP_DEFAULT_ENV
+              value: {{ .Values.watch.defaultEnvironment | quote }}
+            - name: ICP_EMIT_TIMEOUT_MS
+              value: {{ .Values.watch.emitTimeoutMs | quote }}
+            - name: ICP_WATCH_NODE_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: spec.nodeName
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 65532
+            runAsGroup: 65532
+            readOnlyRootFilesystem: true
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
+          resources:
+            {{- toYaml .Values.watcher.resources | nindent 12 }}
+      {{- with .Values.watcher.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.watcher.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.watcher.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+{{- end }}

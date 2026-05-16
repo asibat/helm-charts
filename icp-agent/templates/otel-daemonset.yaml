@@ -1,0 +1,83 @@
+{{- if .Values.otelCollector.enabled }}
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: {{ include "icp-agent.fullname" . }}-otel
+  labels:
+    {{- include "icp-agent.labels" . | nindent 4 }}
+    app.kubernetes.io/component: otel-collector
+spec:
+  selector:
+    matchLabels:
+      {{- include "icp-agent.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: otel-collector
+  template:
+    metadata:
+      labels:
+        {{- include "icp-agent.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: otel-collector
+        {{- with .Values.podLabels }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+      annotations:
+        checksum/config: {{ include (print $.Template.BasePath "/otel-configmap.yaml") . | sha256sum }}
+        {{- with .Values.podAnnotations }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+    spec:
+      serviceAccountName: {{ include "icp-agent.otelServiceAccountName" . }}
+      containers:
+        - name: otel-collector
+          image: "{{ .Values.otelCollector.image.repository }}:{{ .Values.otelCollector.image.tag }}"
+          imagePullPolicy: {{ .Values.otelCollector.image.pullPolicy }}
+          args: ["--config=/conf/config.yaml"]
+          env:
+            - name: ICP_INGEST_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "icp-agent.secretName" . }}
+                  key: {{ .Values.ingestToken.secretKey }}
+          resources:
+            {{- toYaml .Values.otelCollector.resources | nindent 12 }}
+          securityContext:
+            runAsNonRoot: false
+            readOnlyRootFilesystem: true
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
+          livenessProbe:
+            httpGet:
+              path: /
+              port: 13133
+            initialDelaySeconds: 10
+            periodSeconds: 30
+          volumeMounts:
+            - name: config
+              mountPath: /conf
+            - name: varlogpods
+              mountPath: /var/log/pods
+              readOnly: true
+            - name: otelcol-storage
+              mountPath: /var/lib/otelcol
+      volumes:
+        - name: config
+          configMap:
+            name: {{ include "icp-agent.fullname" . }}-otel-config
+        - name: varlogpods
+          hostPath:
+            path: {{ .Values.otelCollector.podLogHostPath }}
+        - name: otelcol-storage
+          emptyDir: {}
+      {{- with .Values.otelCollector.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.otelCollector.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.otelCollector.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+{{- end }}
